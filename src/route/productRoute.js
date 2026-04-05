@@ -8,6 +8,7 @@ const router = express.Router();
 // Public routes (no authentication required)
 router.get("/public", productController.getAllProducts);
 router.get("/public/:productId", productController.getProductById);
+router.get("/vendor-profile/:vendorId", productController.getVendorProfile);
 router.get("/test", (req, res) => {
   res.json({ message: "Product routes are working!", timestamp: new Date().toISOString() });
 });
