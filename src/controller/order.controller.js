@@ -244,3 +244,80 @@ exports.getOrderById = async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch order', details: err.message });
   }
 };
+
+// ── ADMIN ONLY ────────────────────────────────────────────────────
+
+// GET /api/orders/admin/all
+exports.getAllOrdersAdmin = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
+    const pool = require('../config/db');
+    const result = await pool.query(
+      `SELECT o.order_id, o.order_status, o.total_price, o.payment_status,
+              o.full_name, o.email, o.city, o.country, o.created_at,
+              p.payment_method,
+              COUNT(oi.order_item_id) as item_count
+       FROM orders o
+       LEFT JOIN payments p ON p.order_id = o.order_id
+       LEFT JOIN order_items oi ON oi.order_id = o.order_id
+       GROUP BY o.order_id, p.payment_method
+       ORDER BY o.created_at DESC`
+    );
+    res.json({ success: true, orders: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch orders', details: err.message });
+  }
+};
+
+// PATCH /api/orders/admin/:orderId/status
+exports.adminUpdateOrderStatus = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
+    const { status } = req.body;
+    const allowed = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (!allowed.includes(status)) return res.status(400).json({ success: false, error: `Status must be one of: ${allowed.join(', ')}` });
+
+    const pool = require('../config/db');
+    const result = await pool.query(
+      `UPDATE orders SET order_status = $1, updated_at = NOW() WHERE order_id = $2 RETURNING order_id, order_status`,
+      [status, req.params.orderId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ success: false, error: 'Order not found' });
+    res.json({ success: true, message: `Order status updated to ${status}`, order: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update order status', details: err.message });
+  }
+};
+
+// PATCH /api/orders/admin/:orderId/payment-status
+exports.adminUpdatePaymentStatus = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
+    const { payment_status } = req.body;
+    const allowed = ['pending', 'paid', 'failed'];
+    if (!allowed.includes(payment_status)) return res.status(400).json({ success: false, error: `Payment status must be one of: ${allowed.join(', ')}` });
+
+    const pool = require('../config/db');
+    await pool.query(`UPDATE orders SET payment_status = $1, updated_at = NOW() WHERE order_id = $2`, [payment_status, req.params.orderId]);
+    await pool.query(`UPDATE payments SET payment_status = $1, updated_at = NOW() WHERE order_id = $2`, [payment_status, req.params.orderId]);
+    res.json({ success: true, message: `Payment status updated to ${payment_status}` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update payment status', details: err.message });
+  }
+};
+
+// DELETE /api/orders/admin/products/:productId — admin can delete any product
+exports.adminDeleteProduct = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
+    const pool = require('../config/db');
+    const result = await pool.query(
+      `UPDATE products SET is_active = false, updated_at = NOW() WHERE product_id = $1 RETURNING product_id, name`,
+      [req.params.productId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ success: false, error: 'Product not found' });
+    res.json({ success: true, message: 'Product removed', product: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to delete product', details: err.message });
+  }
+};

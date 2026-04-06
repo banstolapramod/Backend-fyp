@@ -83,3 +83,37 @@ exports.deleteReview = async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to delete review', details: err.message });
   }
 };
+
+// GET /api/reviews/admin/all — admin only
+exports.getAllReviewsAdmin = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
+    const result = await pool.query(
+      `SELECT r.review_id, r.rating, r.comment, r.created_at,
+              u.name as user_name,
+              p.name as product_name, p.product_id
+       FROM reviews r
+       JOIN users u ON u.user_id = r.user_id
+       JOIN products p ON p.product_id = r.product_id
+       ORDER BY r.created_at DESC`
+    );
+    res.json({ success: true, reviews: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch reviews', details: err.message });
+  }
+};
+
+// DELETE /api/reviews/admin/:reviewId — admin can delete any review
+exports.adminDeleteReview = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin only' });
+    const result = await pool.query(
+      'DELETE FROM reviews WHERE review_id = $1 RETURNING review_id',
+      [req.params.reviewId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ success: false, error: 'Review not found' });
+    res.json({ success: true, message: 'Review deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to delete review', details: err.message });
+  }
+};

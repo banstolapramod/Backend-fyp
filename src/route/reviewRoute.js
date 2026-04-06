@@ -5,6 +5,8 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // Public
+router.get('/admin/all', authMiddleware, reviewController.getAllReviewsAdmin);
+router.delete('/admin/:reviewId', authMiddleware, reviewController.adminDeleteReview);
 router.get('/:productId', reviewController.getProductReviews);
 
 // Protected
