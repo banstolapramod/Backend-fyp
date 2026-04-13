@@ -124,32 +124,19 @@ exports.getAllUsers = async (req, res) => {
 /* GET ADMIN DASHBOARD STATS */
 exports.getDashboardStats = async (req, res) => {
   try {
-    // Check if user is admin
     if (!req.user || req.user.role !== 'admin') {
-      return res.status(403).json({
-        error: "Access denied. Admin only.",
-      });
+      return res.status(403).json({ error: "Access denied. Admin only." });
     }
 
-    // Get user statistics
-    const userStats = await UserModel.getStats();
-    
-    // Get vendor statistics
-    const totalVendors = await UserModel.countByRole('vendor');
-    
-    // Import query function for custom queries
     const { query } = require('../config/db');
-    
-    const pendingVendors = await query(
-      'SELECT COUNT(*) as count FROM users WHERE role = $1 AND vendor_status = $2 AND is_active = true',
-      ['vendor', 'pending']
-    );
-    const approvedVendors = await query(
-      'SELECT COUNT(*) as count FROM users WHERE role = $1 AND vendor_status = $2 AND is_active = true',
-      ['vendor', 'approved']
-    );
 
-    console.log(`✅ Admin ${req.user.email} fetched dashboard stats`);
+    const [userStats, vendorPending, vendorApproved, productStats, orderStats] = await Promise.all([
+      UserModel.getStats(),
+      query("SELECT COUNT(*) as count FROM users WHERE role='vendor' AND vendor_status='pending' AND is_active=true"),
+      query("SELECT COUNT(*) as count FROM users WHERE role='vendor' AND vendor_status='approved' AND is_active=true"),
+      query("SELECT COUNT(*) as total, COALESCE(SUM(stock_quantity),0) as total_stock FROM products WHERE is_active=true"),
+      query("SELECT COUNT(*) as total_orders, COALESCE(SUM(total_price),0) as total_revenue, COUNT(CASE WHEN order_status='pending' THEN 1 END) as pending_orders, COUNT(CASE WHEN order_status='delivered' THEN 1 END) as delivered_orders FROM orders"),
+    ]);
 
     res.status(200).json({
       users: {
@@ -160,16 +147,24 @@ exports.getDashboardStats = async (req, res) => {
         newUsers30Days: parseInt(userStats.new_users_30_days)
       },
       vendors: {
-        total: totalVendors,
-        pending: parseInt(pendingVendors.rows[0].count),
-        approved: parseInt(approvedVendors.rows[0].count)
+        total: parseInt(userStats.vendors),
+        pending: parseInt(vendorPending.rows[0].count),
+        approved: parseInt(vendorApproved.rows[0].count)
+      },
+      products: {
+        total: parseInt(productStats.rows[0].total),
+        totalStock: parseInt(productStats.rows[0].total_stock)
+      },
+      orders: {
+        total: parseInt(orderStats.rows[0].total_orders),
+        revenue: parseFloat(orderStats.rows[0].total_revenue),
+        pending: parseInt(orderStats.rows[0].pending_orders),
+        delivered: parseInt(orderStats.rows[0].delivered_orders)
       }
     });
   } catch (err) {
     console.error("GET DASHBOARD STATS ERROR:", err);
-    res.status(500).json({
-      error: "Failed to fetch dashboard statistics",
-    });
+    res.status(500).json({ error: "Failed to fetch dashboard statistics" });
   }
 };
 
