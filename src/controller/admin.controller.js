@@ -216,6 +216,44 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+/* UPDATE USER (name, email, role) */
+exports.updateUser = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Access denied. Admin only." });
+    }
+
+    const { userId } = req.params;
+    const { name, email, role } = req.body;
+
+    if (!name || !email || !role) {
+      return res.status(400).json({ error: "Name, email, and role are required" });
+    }
+
+    if (!['customer', 'vendor', 'admin'].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    const pool = require('../config/db');
+    const result = await pool.query(
+      `UPDATE users SET name=$1, email=$2, role=$3, updated_at=NOW()
+       WHERE user_id=$4 AND is_active=true
+       RETURNING user_id as id, name, email, role, vendor_status, updated_at`,
+      [name, email, role, userId]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log(`✅ Admin ${req.user.email} updated user ${userId}`);
+    res.status(200).json({ message: "User updated successfully", user: result.rows[0] });
+  } catch (err) {
+    console.error("UPDATE USER ERROR:", err);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+};
+
 /* GET USER BY ID */
 exports.getUserById = async (req, res) => {
   try {

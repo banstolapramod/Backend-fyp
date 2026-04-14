@@ -30,6 +30,7 @@ router.put("/vendors/:vendorId/status", adminController.updateVendorStatus);
 // User management routes
 router.get("/users", adminController.getAllUsers);
 router.get("/users/:userId", adminController.getUserById);
+router.patch("/users/:userId", adminController.updateUser);
 router.delete("/users/:userId", adminController.deleteUser);
 
 // Dashboard routes
