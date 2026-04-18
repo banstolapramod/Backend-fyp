@@ -11,6 +11,9 @@ const cartRoutes = require("./src/route/cartRoute");
 const wishlistRoutes = require("./src/route/wishlistRoute");
 const orderRoutes = require("./src/route/orderRoute");
 const reviewRoutes = require("./src/route/reviewRoute");
+const khaltiRoutes = require("./src/route/khaltiRoute");
+const stripeRoutes = require("./src/route/stripeRoute");
+const payoutRoutes = require("./src/route/payoutRoute");
 
 const app = express();
 
@@ -29,6 +32,9 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/khalti", khaltiRoutes);
+app.use("/api/stripe", stripeRoutes);
+app.use("/api/payouts", payoutRoutes);
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () =>
